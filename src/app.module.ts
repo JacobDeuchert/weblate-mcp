@@ -3,21 +3,18 @@ import { ConfigModule } from '@nestjs/config';
 import { McpModule, McpTransportType } from '@rekog/mcp-nest';
 import {
   WeblateApiService,
+  AllowedLanguagesService,
   WeblateProjectsService,
   WeblateComponentsService,
   WeblateLanguagesService,
   WeblateTranslationsService,
-  WeblateChangesService,
-  WeblateStatisticsService,
 } from './services';
 import { WeblateClientService } from './services/weblate-client.service';
-import { 
+import {
   WeblateProjectsTool,
   WeblateComponentsTool,
   WeblateLanguagesTool,
   WeblateTranslationsTool,
-  WeblateChangesTool,
-  WeblateStatisticsTool,
 } from './tools';
 import { randomUUID } from 'crypto';
 
@@ -32,51 +29,35 @@ import { randomUUID } from 'crypto';
       version: process.env.MCP_SERVER_VERSION || '1.0.0',
       transport: McpTransportType.STDIO,
       instructions: `This is a Weblate MCP server that provides tools for managing translations.
-      
+
 Available tools:
-Translation Management:
+Discovery:
 - listProjects: List all available Weblate projects
 - listComponents: List components in a specific project
 - listLanguages: List languages available in a specific project
+
+Translation Management:
 - searchStringInProject: Search for translations containing specific text
+- searchUnitsWithFilters: Search translation units using Weblate's filter syntax
 - getTranslationForKey: Get translation value for a specific key
+- findTranslationsForKey: Find all translations for a specific key across components and languages
 - writeTranslation: Write or update a translation value
-- searchTranslationsByKey: Search for translations by key pattern
-- findTranslationsForKey: Find all translations for a specific key
-- listTranslationKeys: List all translation keys in a project
-- searchTranslationKeys: Search for translation keys by pattern
-
-Change Tracking & History:
-- listRecentChanges: List recent changes across all projects
-- getProjectChanges: Get recent changes for a specific project
-- getComponentChanges: Get recent changes for a specific component
-- getChangesByUser: Get recent changes by a specific user
-
-Translation Statistics Dashboard:
-- getProjectStatistics: Get comprehensive project statistics with completion rates
-- getComponentStatistics: Get detailed statistics for a specific component
-- getProjectDashboard: Get full dashboard overview with all component statistics
-- getTranslationStatistics: Get statistics for specific translation (project/component/language)
-- getComponentLanguageProgress: Get translation progress for all languages in a component
-- getLanguageStatistics: Get statistics for a language across all projects
-- getUserStatistics: Get contribution statistics for a specific user`,
+- bulkWriteTranslations: Update multiple translations in a single batch
+- createTranslationUnit: Create a new translation unit (key) - supports monolingual and bilingual formats`,
     }),
   ],
   providers: [
     WeblateClientService,
+    AllowedLanguagesService,
     WeblateProjectsService,
     WeblateComponentsService,
     WeblateLanguagesService,
     WeblateTranslationsService,
-    WeblateChangesService,
     WeblateApiService,
-    WeblateStatisticsService,
     WeblateProjectsTool,
     WeblateComponentsTool,
     WeblateLanguagesTool,
     WeblateTranslationsTool,
-    WeblateChangesTool,
-    WeblateStatisticsTool,
   ],
 })
 export class AppModule {}

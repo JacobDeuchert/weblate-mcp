@@ -149,11 +149,12 @@ export class WeblateTranslationsTool {
 
   @Tool({
     name: 'writeTranslation',
-    description: 'Update or write a translation value for a specific key',
+    description:
+      'Update or write a translation value for a specific key. Only languages in the server ALLOWED_LANGUAGES allowlist can be written (if configured); other codes are rejected.',
     parameters: z.object({
       projectSlug: z.string().describe('The slug of the project'),
       componentSlug: z.string().describe('The slug of the component'),
-      languageCode: z.string().describe('The language code (e.g., en, es, fr)'),
+      languageCode: z.string().describe('The language code (e.g., en, es, fr). Must be in ALLOWED_LANGUAGES if configured'),
       key: z.string().describe('The translation key to update'),
       value: z.string().describe('The new translation value'),
       markAsApproved: z
@@ -214,11 +215,12 @@ export class WeblateTranslationsTool {
 
   @Tool({
     name: 'bulkWriteTranslations',
-    description: 'Update multiple translations in batch for efficient bulk operations',
+    description:
+      'Update multiple translations in batch for efficient bulk operations. Only languages in the server ALLOWED_LANGUAGES allowlist can be written (if configured).',
     parameters: z.object({
       projectSlug: z.string().describe('The slug of the project'),
       componentSlug: z.string().describe('The slug of the component'),
-      languageCode: z.string().describe('The language code (e.g., en, es, fr)'),
+      languageCode: z.string().describe('The language code (e.g., en, es, fr). Must be in ALLOWED_LANGUAGES if configured'),
       translations: z.array(z.object({
         key: z.string().describe('The translation key to update'),
         value: z.string().describe('The new translation value'),
@@ -438,6 +440,99 @@ export class WeblateTranslationsTool {
           {
             type: 'text',
             text: `Error searching units: ${error.message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  @Tool({
+    name: 'createTranslationUnit',
+    description:
+      'Create a new translation unit (key) in a Weblate translation. Use key+value for monolingual formats (JSON, Android) or context+source+target for bilingual formats (PO, XLIFF). Only languages in the server ALLOWED_LANGUAGES allowlist can be used (if configured).',
+    parameters: z.object({
+      projectSlug: z.string().describe('The project URL slug'),
+      componentSlug: z.string().describe('The component URL slug'),
+      languageCode: z.string().describe('The translation language code. Must be in ALLOWED_LANGUAGES if configured'),
+      key: z
+        .string()
+        .optional()
+        .describe('Key for monolingual formats (JSON, Android)'),
+      value: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Array of strings — single element for regular, multiple for plural forms, e.g. ["Hello"]',
+        ),
+      context: z
+        .string()
+        .optional()
+        .describe('Context for bilingual formats (PO, XLIFF)'),
+      source: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Array of strings — single element for regular, multiple for plural forms, e.g. ["Hello"]',
+        ),
+      target: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Array of strings — single element for regular, multiple for plural forms, e.g. ["Hallo"]',
+        ),
+      state: z
+        .number()
+        .optional()
+        .describe(
+          'Unit state: 0=untranslated, 10=needs editing, 20=translated, 30=approved',
+        ),
+    }),
+  })
+  async createTranslationUnit({
+    projectSlug,
+    componentSlug,
+    languageCode,
+    key,
+    value,
+    context,
+    source,
+    target,
+    state,
+  }: {
+    projectSlug: string;
+    componentSlug: string;
+    languageCode: string;
+    key?: string;
+    value?: string[];
+    context?: string;
+    source?: string[];
+    target?: string[];
+    state?: number;
+  }) {
+    try {
+      const unit = await this.weblateApiService.createTranslationUnit(
+        projectSlug,
+        componentSlug,
+        languageCode,
+        { key, value, context, source, target, state },
+      );
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Successfully created translation unit in ${projectSlug}/${componentSlug}/${languageCode}\n\n**ID:** ${unit.id}\n**Key/Context:** ${unit.context || key || '(none)'}\n**Source:** ${Array.isArray(unit.source) ? unit.source.join(', ') : unit.source}\n**web_url:** ${unit.web_url || '(not available)'}`,
+          },
+        ],
+      };
+    } catch (error) {
+      this.logger.error('Failed to create translation unit', error);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error creating translation unit: ${error.message}`,
           },
         ],
         isError: true,

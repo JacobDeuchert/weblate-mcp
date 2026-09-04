@@ -4,14 +4,12 @@ import {
   WeblateComponentsService,
   WeblateLanguagesService,
   WeblateTranslationsService,
-  WeblateChangesService,
 } from './weblate';
 import {
   type Project,
   type Component,
   type Language,
   type Unit,
-  type Change,
 } from '../client';
 import { SearchIn } from '../types';
 
@@ -22,7 +20,6 @@ export class WeblateApiService {
     private readonly componentsService: WeblateComponentsService,
     private readonly languagesService: WeblateLanguagesService,
     private readonly translationsService: WeblateTranslationsService,
-    private readonly changesService: WeblateChangesService,
   ) {}
 
   // Project methods
@@ -169,30 +166,25 @@ export class WeblateApiService {
     );
   }
 
-  // Change tracking methods
-  async listRecentChanges(
-    limit: number = 50,
-    user?: string,
-    timestampAfter?: string,
-    timestampBefore?: string,
-  ): Promise<{ results: Change[]; count: number; next?: string; previous?: string }> {
-    return this.changesService.listRecentChanges(limit, user, timestampAfter, timestampBefore);
-  }
-
-  async getProjectChanges(projectSlug: string) {
-    return this.changesService.getProjectChanges(projectSlug);
-  }
-
-  async getComponentChanges(projectSlug: string, componentSlug: string) {
-    return this.changesService.getComponentChanges(projectSlug, componentSlug);
-  }
-
-  async getChangesByAction(actionCodes: number[], limit: number = 50) {
-    return this.changesService.getChangesByAction(actionCodes, limit);
-  }
-
-  async getChangesByUser(user: string, limit: number = 50) {
-    return this.changesService.getChangesByUser(user, limit);
+  async createTranslationUnit(
+    projectSlug: string,
+    componentSlug: string,
+    languageCode: string,
+    params: {
+      key?: string;
+      value?: string[];
+      context?: string;
+      source?: string[];
+      target?: string[];
+      state?: number;
+    },
+  ): Promise<Unit> {
+    return this.translationsService.createTranslationUnit(
+      projectSlug,
+      componentSlug,
+      languageCode,
+      params,
+    );
   }
 
   async searchUnitsWithQuery(

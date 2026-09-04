@@ -11,7 +11,8 @@ export class WeblateLanguagesTool {
 
   @Tool({
     name: 'listLanguages',
-    description: 'List languages available in a specific project',
+    description:
+      'List languages available in a specific project. When the server ALLOWED_LANGUAGES allowlist is configured, only allowed languages are returned',
     parameters: z.object({
       projectSlug: z.string().describe('The slug of the project'),
     }),

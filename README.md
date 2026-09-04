@@ -51,7 +51,52 @@ The easiest way to use this MCP server is with npx - no installation required!
 npx @mmntm/weblate-mcp
 ```
 
-### Option 2: Development Setup
+### Option 2: Run with Docker
+
+Build the image once:
+```bash
+docker build -t weblate-mcp .
+```
+
+Then point your MCP client at the container. The server speaks over STDIO, so it
+must be run with `-i` (interactive). Pass the configuration as environment
+variables:
+```json
+{
+  "mcpServers": {
+    "weblate": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "WEBLATE_API_URL",
+        "-e",
+        "WEBLATE_API_TOKEN",
+        "weblate-mcp"
+      ],
+      "env": {
+        "WEBLATE_API_URL": "https://your-weblate-instance.com/api",
+        "WEBLATE_API_TOKEN": "your-weblate-api-token"
+      }
+    }
+  }
+}
+```
+
+The `-e WEBLATE_API_URL` form (without a value) forwards the variable from the
+client's `env` block into the container.
+
+**Manual testing:**
+```bash
+docker run -i --rm \
+  -e WEBLATE_API_URL=https://your-weblate-instance.com/api \
+  -e WEBLATE_API_TOKEN=your-weblate-api-token \
+  weblate-mcp
+```
+
+### Option 3: Development Setup
 
 ### Prerequisites
 - Node.js 18+
@@ -83,7 +128,15 @@ WEBLATE_API_TOKEN=your-api-token-here
 PORT=3001
 NODE_ENV=production
 LOG_LEVEL=info
+# Optional: restrict writable languages (comma-separated, empty = all allowed)
+# Enforced on writeTranslation, bulkWriteTranslations, createTranslationUnit.
+# listLanguages is filtered. Reads are not blocked.
+ALLOWED_LANGUAGES=de,fr,sk
 ```
+
+To limit languages, set `ALLOWED_LANGUAGES` (e.g. `de,fr,sk`) in your `.env`
+or in the MCP client `env` block. Writes to any other `languageCode` fail
+with an `isError` response naming the allowed languages.
 
 ## 🔗 MCP Client Configuration
 

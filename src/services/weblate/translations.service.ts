@@ -1,13 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { WeblateClientService } from '../weblate-client.service';
-import { unitsList, unitsPartialUpdate, translationsUnitsRetrieve, type Unit, type PaginatedUnitList, type UnitsListData, type TranslationsUnitsRetrieveData } from '../../client';
+import { AllowedLanguagesService } from '../allowed-languages.service';
+import { unitsList, unitsPartialUpdate, translationsUnitsRetrieve, translationsUnitsCreate, type Unit, type PaginatedUnitList, type UnitsListData, type TranslationsUnitsRetrieveData, type TranslationsUnitsCreateData } from '../../client';
 import { SearchIn } from '../../types';
 
 @Injectable()
 export class WeblateTranslationsService {
   private readonly logger = new Logger(WeblateTranslationsService.name);
 
-  constructor(private weblateClientService: WeblateClientService) {}
+  constructor(
+    private weblateClientService: WeblateClientService,
+    @Optional()
+    @Inject(AllowedLanguagesService)
+    private readonly allowedLanguages?: AllowedLanguagesService,
+  ) {}
 
   async searchTranslations(
     projectSlug: string,
@@ -90,14 +96,38 @@ export class WeblateTranslationsService {
     key: string,
   ): Promise<Unit | null> {
     try {
+      // Use the exact-match operator (`:=`) rather than a substring/full-text
+      // search. A plain `context:"KEY"` matches any unit whose context
+      // *contains* KEY, so a prefix key (e.g. UNSAVEDCHANGES) would also match
+      // UNSAVEDCHANGESWILLBELOST and the wrong unit could be written.
       const searchResult = await this.searchTranslations(
         projectSlug,
         componentSlug,
         languageCode,
-        `context:"${key}"`,
+        `context:=${JSON.stringify(key)}`,
       );
 
-      return searchResult.results.length > 0 ? searchResult.results[0] : null;
+      // Fail on ambiguity: the same key present in more than one unit
+      // (e.g. duplicated across files) must not silently resolve to results[0].
+      const exactMatches = searchResult.results.filter(
+        unit => unit.context === key,
+      );
+
+      if (exactMatches.length === 0) {
+        return null;
+      }
+
+      if (exactMatches.length > 1) {
+        const found = exactMatches
+          .map(unit => `id=${unit.id}`)
+          .join(', ');
+        throw new Error(
+          `Ambiguous key "${key}": ${exactMatches.length} units matched (${found}). ` +
+            `Refine by component/language so the key resolves to a single unit.`,
+        );
+      }
+
+      return exactMatches[0];
     } catch (error) {
       this.logger.error(`Failed to get translation for key ${key}`, error);
       throw new Error(
@@ -164,6 +194,8 @@ export class WeblateTranslationsService {
     markAsApproved: boolean = false,
   ): Promise<Unit | null> {
     try {
+      this.allowedLanguages?.assertLanguageAllowed(languageCode);
+
       // First, find the translation unit by key
       const unit = await this.getTranslationByKey(
         projectSlug,
@@ -191,7 +223,16 @@ export class WeblateTranslationsService {
         },
       });
 
-      return response.data as Unit;
+      // The PATCH response omits identity fields (id, context). Overlay the
+      // updated fields from the write onto the verified lookup unit, then
+      // re-pin id/context from the lookup so a missing/undefined field in the
+      // response can't clobber them — the echo can then be trusted.
+      return {
+        ...unit,
+        ...(response.data as Unit),
+        id: unit.id,
+        context: unit.context,
+      } as Unit;
     } catch (error) {
       this.logger.error(`Failed to write translation for key ${key}`, error);
       throw new Error(
@@ -533,4 +574,48 @@ export class WeblateTranslationsService {
     
     return parts;
   }
-} 
+
+  async createTranslationUnit(
+    projectSlug: string,
+    componentSlug: string,
+    languageCode: string,
+    params: {
+      key?: string;
+      value?: string[];
+      context?: string;
+      source?: string[];
+      target?: string[];
+      state?: number;
+    },
+  ): Promise<Unit> {
+    try {
+      this.allowedLanguages?.assertLanguageAllowed(languageCode);
+
+      const client = this.weblateClientService.getClient();
+
+      const response = await translationsUnitsCreate({
+        client,
+        path: {
+          component__project__slug: projectSlug,
+          component__slug: componentSlug,
+          language__code: languageCode,
+        },
+        body: params as TranslationsUnitsCreateData['body'],
+      });
+
+      if (response.error) {
+        throw new Error(`API error: ${JSON.stringify(response.error)}`);
+      }
+
+      return response.data as unknown as Unit;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create translation unit in ${projectSlug}/${componentSlug}/${languageCode}`,
+        error,
+      );
+      throw new Error(
+        `Failed to create translation unit: ${error.message}`,
+      );
+    }
+  }
+}
