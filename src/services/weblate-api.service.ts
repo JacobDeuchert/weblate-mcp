@@ -4,6 +4,10 @@ import {
   WeblateComponentsService,
   WeblateLanguagesService,
   WeblateTranslationsService,
+  WeblateRepositoryService,
+  type RepositoryOperation,
+  type RepositoryOperationResult,
+  type RepositoryStatus,
 } from './weblate';
 import {
   type Project,
@@ -20,6 +24,7 @@ export class WeblateApiService {
     private readonly componentsService: WeblateComponentsService,
     private readonly languagesService: WeblateLanguagesService,
     private readonly translationsService: WeblateTranslationsService,
+    private readonly repositoryService: WeblateRepositoryService,
   ) {}
 
   // Project methods
@@ -201,5 +206,51 @@ export class WeblateApiService {
       searchQuery,
       limit,
     );
+  }
+
+  // Repository methods
+  async getRepositoryStatus(
+    projectSlug: string,
+    componentSlug?: string,
+  ): Promise<RepositoryStatus> {
+    if (componentSlug) {
+      return this.repositoryService.getComponentRepositoryStatus(
+        projectSlug,
+        componentSlug,
+      );
+    }
+    return this.repositoryService.getProjectRepositoryStatus(projectSlug);
+  }
+
+  async repositoryOperation(
+    projectSlug: string,
+    operation: RepositoryOperation,
+    componentSlug?: string,
+  ): Promise<RepositoryOperationResult> {
+    if (componentSlug) {
+      return this.repositoryService.componentRepositoryOperation(
+        projectSlug,
+        componentSlug,
+        operation,
+      );
+    }
+    return this.repositoryService.projectRepositoryOperation(
+      projectSlug,
+      operation,
+    );
+  }
+
+  async commitRepository(
+    projectSlug: string,
+    componentSlug?: string,
+  ): Promise<RepositoryOperationResult> {
+    return this.repositoryOperation(projectSlug, 'commit', componentSlug);
+  }
+
+  async pushRepository(
+    projectSlug: string,
+    componentSlug?: string,
+  ): Promise<RepositoryOperationResult> {
+    return this.repositoryOperation(projectSlug, 'push', componentSlug);
   }
 }

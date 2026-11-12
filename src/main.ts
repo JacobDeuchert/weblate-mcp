@@ -1,16 +1,20 @@
-#!/usr/bin/env node
-
 import { NestFactory } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  // Create application context for STDIO transport (no HTTP server needed)
-  const app = await NestFactory.createApplicationContext(AppModule, {
-    logger: process.env.NODE_ENV === 'production' ? false : ['error', 'warn', 'log'], // Disable all logging for MCP STDIO compatibility
-  });
-  
-  // Keep the application running to handle MCP STDIO communication
-  // Don't close the app as it needs to stay alive for MCP communication
+  const app = await NestFactory.create(AppModule);
+
+  // Containers terminate via SIGTERM; let Nest run its shutdown hooks.
+  app.enableShutdownHooks();
+
+  const port = Number(process.env.PORT ?? 3000);
+  await app.listen(port, '0.0.0.0');
+
+  Logger.log(
+    `Weblate MCP server listening on http://0.0.0.0:${port}/mcp`,
+    'Bootstrap',
+  );
 }
 
 void bootstrap();

@@ -14,7 +14,7 @@ test
 examples
 docs
 *.md
-.changeset
+pnpm-workspace.yaml
 .history
 tmp
 temp

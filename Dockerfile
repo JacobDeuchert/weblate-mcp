@@ -9,7 +9,7 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Install dependencies (cached unless lockfile/manifest changes)
-COPY package.json pnpm-lock.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Build the project
@@ -34,5 +34,7 @@ COPY --from=build /app/package.json ./package.json
 # Run as the non-root user that ships with the node image
 USER node
 
-# MCP server communicates over STDIO
-ENTRYPOINT ["node", "dist/main.js"]
+# MCP server speaks streamable HTTP on this port
+EXPOSE 3000
+
+CMD ["node", "dist/main.js"]

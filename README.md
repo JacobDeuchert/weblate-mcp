@@ -10,7 +10,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that p
 - **🔍 Component Operations**: Handle translation components and configurations
 - **✏️ Translation Management**: Update, search, and manage translations
 - **🌐 Language Support**: Work with all supported languages in your Weblate instance
-- **🚀 Multiple Transports**: HTTP/SSE, Streamable HTTP, and STDIO support
+- **🚀 Stateless HTTP**: One container serves any number of MCP clients concurrently
 - **🛡️ Type Safety**: Full TypeScript implementation with comprehensive error handling
 - **⚡ LLM-Optimized**: Tools designed to guide AI models toward efficient usage patterns
 
@@ -25,85 +25,44 @@ This MCP server acts as a bridge between AI assistants (like Claude Desktop) and
 
 ## 🚀 Quick Start
 
-### Option 1: Use with npx (Recommended)
+### Run the container
 
-The easiest way to use this MCP server is with npx - no installation required!
+The server is stateless and speaks Streamable HTTP, so one container serves any
+number of MCP clients at the same time.
 
-**For Claude Desktop or other MCP clients:**
-```json
-{
-  "mcpServers": {
-    "weblate": {
-      "command": "npx",
-      "args": ["-y", "@mmntm/weblate-mcp"],
-      "env": {
-        "WEBLATE_API_URL": "https://your-weblate-instance.com/api",
-        "WEBLATE_API_TOKEN": "your-weblate-api-token"
-      }
-    }
-  }
-}
-```
-
-**Manual testing:**
-```bash
-# Test the server directly
-npx @mmntm/weblate-mcp
-```
-
-### Option 2: Run with Docker
-
-Build the image once:
+Build the image:
 ```bash
 docker build -t weblate-mcp .
 ```
 
-Then point your MCP client at the container. The server speaks over STDIO, so it
-must be run with `-i` (interactive). Pass the configuration as environment
-variables:
-```json
-{
-  "mcpServers": {
-    "weblate": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e",
-        "WEBLATE_API_URL",
-        "-e",
-        "WEBLATE_API_TOKEN",
-        "weblate-mcp"
-      ],
-      "env": {
-        "WEBLATE_API_URL": "https://your-weblate-instance.com/api",
-        "WEBLATE_API_TOKEN": "your-weblate-api-token"
-      }
-    }
-  }
-}
-```
-
-The `-e WEBLATE_API_URL` form (without a value) forwards the variable from the
-client's `env` block into the container.
-
-**Manual testing:**
+Run it:
 ```bash
-docker run -i --rm \
+docker run -d --name weblate-mcp -p 3000:3000 \
   -e WEBLATE_API_URL=https://your-weblate-instance.com/api \
   -e WEBLATE_API_TOKEN=your-weblate-api-token \
+  -e ALLOWED_LANGUAGES=de,fr,sk \
   weblate-mcp
 ```
 
-### Option 3: Development Setup
+The Weblate credentials belong to the container, not to the clients — every
+client connecting to it acts with that one token.
 
-### Prerequisites
+Smoke-test it:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+### Development Setup
+
+#### Prerequisites
 - Node.js 18+
 - pnpm package manager
 - Weblate instance with API access
 
-### Installation
+#### Installation
 ```bash
 # Clone and install
 git clone <this-repo>
@@ -119,13 +78,13 @@ pnpm build
 pnpm start
 ```
 
-Server runs on `http://localhost:3001` by default.
+Server listens on `http://localhost:3000/mcp` by default.
 
-### Environment Configuration
+#### Environment Configuration
 ```env
 WEBLATE_API_URL=https://your-weblate-instance.com
 WEBLATE_API_TOKEN=your-api-token-here
-PORT=3001
+PORT=3000
 NODE_ENV=production
 LOG_LEVEL=info
 # Optional: restrict writable languages (comma-separated, empty = all allowed)
@@ -135,52 +94,31 @@ ALLOWED_LANGUAGES=de,fr,sk
 ```
 
 To limit languages, set `ALLOWED_LANGUAGES` (e.g. `de,fr,sk`) in your `.env`
-or in the MCP client `env` block. Writes to any other `languageCode` fail
+or in the container's environment. Writes to any other `languageCode` fail
 with an `isError` response naming the allowed languages.
 
 ## 🔗 MCP Client Configuration
 
-### Claude Desktop (npx method - Recommended)
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+Point any MCP client at the running container's `/mcp` endpoint.
+
+### Claude Code
+```bash
+claude mcp add --transport http weblate http://localhost:3000/mcp
+```
+
+### Claude Desktop / Cursor / VS Code
 ```json
 {
   "mcpServers": {
     "weblate": {
-      "command": "npx",
-      "args": ["-y", "@mmntm/weblate-mcp"],
-      "env": {
-        "WEBLATE_API_URL": "https://your-weblate-instance.com/api",
-        "WEBLATE_API_TOKEN": "your-weblate-api-token"
-      }
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
     }
   }
 }
 ```
 
-### Claude Desktop (Development/Local)
-For development or local builds:
-```json
-{
-  "mcpServers": {
-    "weblate": {
-      "command": "node",
-      "args": ["/path/to/weblate-mcp/dist/main.js"],
-      "env": {
-        "WEBLATE_API_URL": "https://your-weblate-instance.com/api",
-        "WEBLATE_API_TOKEN": "your-api-token"
-      }
-    }
-  }
-}
-```
-
-### HTTP Clients (Cursor, VS Code, Web Apps)
-```json
-{
-  "transport": "http",
-  "url": "http://localhost:3001/mcp"
-}
-```
+No credentials go in the client config — the container holds them.
 
 ## 🛠️ Available Tools
 
@@ -295,8 +233,6 @@ await update_translation({
 | **[📋 API Reference](./docs/API.md)** | Complete API documentation with examples |
 | **[🛠️ Development Guide](./docs/DEVELOPMENT.md)** | Contributing, development setup, and testing |
 | **[🏗️ Architecture](./docs/ARCHITECTURE.md)** | Codebase structure, patterns, and design decisions |
-| **[📦 Release Process](./docs/RELEASE.md)** | Release management and publishing workflow |
-| **[🔄 Changesets Guide](./docs/CHANGESETS.md)** | Version management with changesets |
 
 ## 🏗️ Architecture
 

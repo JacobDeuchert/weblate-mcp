@@ -1,102 +1,78 @@
 # Weblate MCP Server Setup
 
-This guide shows you how to configure and use the Weblate MCP (Model Context Protocol) server with Claude Desktop and other MCP-compatible clients.
+This guide shows you how to run the Weblate MCP (Model Context Protocol) server as a container and connect MCP-compatible clients to it.
 
 ## Quick Start
 
-### Installation & Configuration
+The server runs as a single stateless HTTP container. Credentials live in the
+container, not in any client config — every client that connects uses that one
+Weblate token.
 
-1. **Add to Claude Desktop configuration**
-   
-   Edit your Claude Desktop configuration file:
-   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+### 1. Build and run the container
 
-2. **Add the Weblate MCP server configuration**:
+```bash
+docker build -t weblate-mcp .
 
-```json
-{
-  "mcpServers": {
-    "weblate": {
-      "command": "npx",
-      "args": ["-y", "@mmntm/weblate-mcp"],
-      "env": {
-        "WEBLATE_API_URL": "https://your-weblate-instance.com/api",
-        "WEBLATE_API_TOKEN": "your-weblate-api-token"
-      }
-    }
-  }
-}
+docker run -d --name weblate-mcp -p 3000:3000 \
+  -e WEBLATE_API_URL=https://your-weblate-instance.com/api \
+  -e WEBLATE_API_TOKEN=your-weblate-api-token \
+  weblate-mcp
 ```
 
-3. **Environment Variables Required**:
-   - `WEBLATE_API_URL`: Your Weblate instance API endpoint (e.g., `https://hosted.weblate.org/api`)
-   - `WEBLATE_API_TOKEN`: Your Weblate API authentication token
+Environment variables:
 
-### Getting Your Weblate API Token
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `WEBLATE_API_URL` | yes | Weblate API endpoint, e.g. `https://hosted.weblate.org/api` |
+| `WEBLATE_API_TOKEN` | yes | Weblate API token |
+| `PORT` | no | Listen port, defaults to `3000` |
+| `ALLOWED_LANGUAGES` | no | Comma-separated write allowlist, e.g. `de,fr,sk`. Empty = all |
+| `MCP_SERVER_NAME` / `MCP_SERVER_VERSION` | no | Identity reported during `initialize` |
+
+### 2. Get your Weblate API token
 
 1. Log into your Weblate instance
 2. Go to **Settings** → **API access**
 3. Create a new token or copy an existing one
 4. The token should have appropriate permissions for the projects you want to manage
 
-## Configuration Examples
+### 3. Connect your clients
 
-### Basic Configuration
+Any number of MCP clients can point at the same container concurrently.
+
+**Claude Code:**
+```bash
+claude mcp add --transport http weblate http://localhost:3000/mcp
+```
+
+**Claude Desktop / Cursor / VS Code:**
 ```json
 {
   "mcpServers": {
     "weblate": {
-      "command": "npx",
-      "args": ["-y", "@mmntm/weblate-mcp"],
-      "env": {
-        "WEBLATE_API_URL": "https://hosted.weblate.org/api",
-        "WEBLATE_API_TOKEN": "wlt_abc123def456..."
-      }
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
     }
   }
 }
 ```
 
-### Self-hosted Weblate
-```json
-{
-  "mcpServers": {
-    "weblate": {
-      "command": "npx",
-      "args": ["-y", "@mmntm/weblate-mcp"],
-      "env": {
-        "WEBLATE_API_URL": "https://weblate.mycompany.com/api",
-        "WEBLATE_API_TOKEN": "wlt_your_token_here"
-      }
-    }
-  }
-}
+### Multiple Weblate instances
+
+Run one container per instance on different ports:
+
+```bash
+docker run -d --name weblate-prod -p 3000:3000 \
+  -e WEBLATE_API_URL=https://weblate-prod.company.com/api \
+  -e WEBLATE_API_TOKEN=wlt_prod_token weblate-mcp
+
+docker run -d --name weblate-staging -p 3001:3000 \
+  -e WEBLATE_API_URL=https://weblate-staging.company.com/api \
+  -e WEBLATE_API_TOKEN=wlt_staging_token weblate-mcp
 ```
 
-### Multiple Weblate Instances
-```json
-{
-  "mcpServers": {
-    "weblate-prod": {
-      "command": "npx",
-      "args": ["-y", "@mmntm/weblate-mcp"],
-      "env": {
-        "WEBLATE_API_URL": "https://weblate-prod.company.com/api",
-        "WEBLATE_API_TOKEN": "wlt_prod_token"
-      }
-    },
-    "weblate-staging": {
-      "command": "npx",
-      "args": ["-y", "@mmntm/weblate-mcp"],
-      "env": {
-        "WEBLATE_API_URL": "https://weblate-staging.company.com/api",
-        "WEBLATE_API_TOKEN": "wlt_staging_token"
-      }
-    }
-  }
-}
-```
+Then register them as two MCP servers (`weblate-prod`, `weblate-staging`)
+pointing at `http://localhost:3000/mcp` and `http://localhost:3001/mcp`.
 
 ## Available Tools
 
@@ -155,42 +131,32 @@ The `searchUnitsWithFilters` tool uses Weblate's native search capabilities for 
 
 ### Common Issues
 
-1. **"Server failed to start"**
-   - Check that your `WEBLATE_API_URL` and `WEBLATE_API_TOKEN` are correct
-   - Ensure the Weblate API is accessible from your network
-   - Verify the API token has the necessary permissions
-
-2. **"npx command not found"**
-   - Make sure Node.js and npm are installed
-   - Try using the full path: `/usr/local/bin/npx` (on macOS/Linux)
-
-3. **"Package not found"**
-   - Ensure you have internet connectivity for npx to download the package
-   - Try running `npx @mmntm/weblate-mcp` manually first
-
-4. **"API authentication failed"**
-   - Double-check your API token is valid and not expired
-   - Verify the token has access to the projects you're trying to use
+1. **"Server failed to start"** — check the container logs with
+   `docker logs weblate-mcp`. Missing `WEBLATE_API_URL` or
+   `WEBLATE_API_TOKEN` makes the server exit at startup.
+2. **Client cannot connect** — confirm the container is up and the port is
+   published: `docker ps`. The endpoint is `/mcp`, not `/`.
+3. **"API authentication failed"** — the token is invalid, expired, or lacks
+   access to the project.
 
 ### Manual Testing
 
-You can test the server manually:
-
 ```bash
-# Test if the package can be run
-npx @mmntm/weblate-mcp
-
-# Or install globally and test
-npm install -g @mmntm/weblate-mcp
-weblate-mcp
+# List the tools the server exposes (no session handshake needed — it is stateless)
+curl -s -X POST http://localhost:3000/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
 ### Logs and Debugging
 
-MCP servers run in STDIO mode with logging disabled by default. If you need to debug:
+```bash
+docker logs -f weblate-mcp
+```
 
-1. Check Claude Desktop's logs (usually in the app's log directory)
-2. Test the Weblate API directly: `curl -H "Authorization: Token YOUR_TOKEN" https://your-weblate-instance.com/api/projects/`
+Test the Weblate API directly to isolate credential problems:
+`curl -H "Authorization: Token YOUR_TOKEN" https://your-weblate-instance.com/api/projects/`
 
 ## Security Notes
 
@@ -210,5 +176,5 @@ MCP servers run in STDIO mode with logging disabled by default. If you need to d
 If you encounter issues:
 1. Check this documentation first
 2. Verify your Weblate API setup
-3. Test the package manually with `npx @mmntm/weblate-mcp`
+3. Check the container logs with `docker logs weblate-mcp`
 4. Report issues on the [GitHub repository](https://github.com/mmntm/weblate-mcp) 

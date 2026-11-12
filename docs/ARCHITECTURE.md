@@ -6,9 +6,9 @@ This document provides a comprehensive overview of the Weblate MCP Server archit
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    MCP Client (Claude Desktop)              │
+│              MCP Clients (one or many, concurrent)          │
 └─────────────────────┬───────────────────────────────────────┘
-                      │ MCP Protocol (JSON-RPC over stdio)
+                      │ MCP Protocol (JSON-RPC over Streamable HTTP, POST /mcp)
 ┌─────────────────────▼───────────────────────────────────────┐
 │                 Weblate MCP Server                          │
 │  ┌─────────────────────────────────────────────────────────┐│

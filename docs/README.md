@@ -13,39 +13,32 @@ Welcome to the comprehensive documentation for the Weblate Model Context Protoco
 - **[API Reference](./API.md)** - Complete API documentation
 - **[Architecture](./ARCHITECTURE.md)** - Understanding the codebase structure
 
-### Release Management
-- **[Release Process](./RELEASE.md)** - How releases are managed and published
-- **[Changesets Guide](./CHANGESETS.md)** - Using changesets for version management
-
 ## 🚀 Quick Start
 
-### NPX Installation (Recommended)
+### Run the container
 ```bash
-# Install and run directly with npx
-npx @mmntm/weblate-mcp
+docker build -t weblate-mcp .
+
+docker run -d --name weblate-mcp -p 3000:3000 \
+  -e WEBLATE_API_URL=https://your-weblate-instance.com/api \
+  -e WEBLATE_API_TOKEN=your-api-token \
+  weblate-mcp
 ```
 
-### Global Installation
-```bash
-# Install globally
-npm install -g @mmntm/weblate-mcp
+### Connect a client
+The server is stateless, so any number of clients can share one container.
 
-# Run the server
-weblate-mcp
+```bash
+claude mcp add --transport http weblate http://localhost:3000/mcp
 ```
 
-### Configuration
-Add to your Claude Desktop configuration:
+Or, for config-file based clients:
 ```json
 {
   "mcpServers": {
     "weblate": {
-      "command": "npx",
-      "args": ["-y", "@mmntm/weblate-mcp"],
-      "env": {
-        "WEBLATE_API_URL": "https://your-weblate-instance.com/api/",
-        "WEBLATE_API_TOKEN": "your-api-token"
-      }
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
     }
   }
 }
@@ -59,6 +52,7 @@ Add to your Claude Desktop configuration:
 | `WEBLATE_API_TOKEN` | Your Weblate API token | ✅ |
 | `PORT` | Server port (default: 3000) | ❌ |
 | `NODE_ENV` | Environment mode | ❌ |
+| `ALLOWED_LANGUAGES` | Comma-separated write allowlist (empty = all) | ❌ |
 
 ## 📖 Available Tools
 

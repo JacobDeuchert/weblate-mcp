@@ -201,17 +201,7 @@ pnpm run test
 pnpm run build
 ```
 
-### 4. Create a Changeset
-
-For any user-facing changes, create a changeset:
-
-```bash
-pnpm changeset
-```
-
-Follow the prompts to describe your changes.
-
-### 5. Commit and Push
+### 4. Commit and Push
 
 ```bash
 git add .
@@ -219,22 +209,21 @@ git commit -m "feat: add new feature"
 git push origin feature/your-feature-name
 ```
 
-### 6. Create a Pull Request
+### 5. Create a Pull Request
 
 - Create a PR against the `main` branch
 - Provide a clear description of your changes
 - Link any related issues
 
-## 🚀 Release Process
+## 🚀 Shipping
 
-The project uses automated releases with Changesets:
+The project is not published to npm — it is built and run as a container:
 
-1. Changes are merged to `main`
-2. GitHub Actions runs CI/CD pipeline
-3. If changesets exist, a release PR is created
-4. Merging the release PR publishes to npm
+```bash
+docker build -t weblate-mcp .
+```
 
-See [Release Process](./RELEASE.md) for detailed information.
+See [Setup](./MCP_SETUP.md) for running it and connecting clients.
 
 ## 🐛 Debugging
 
@@ -282,5 +271,4 @@ Before submitting a PR, ensure:
 - [ ] Tests pass (`pnpm test`)
 - [ ] Build succeeds (`pnpm run build`)
 - [ ] Documentation is updated if needed
-- [ ] Changeset is created for user-facing changes
 - [ ] PR description is clear and complete 
